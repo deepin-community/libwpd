@@ -1,0 +1,114 @@
+#!/usr/bin/make -f
+# Sample debian/rules that uses debhelper.
+# GNU copyright 1997 to 1999 by Joey Hess.
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+
+include /usr/share/dpkg/architecture.mk
+include /usr/share/dpkg/buildflags.mk
+
+ifneq (,$(filter parallel=%,$(subst $(COMMA), ,$(DEB_BUILD_OPTIONS))))
+  NJOBS := -j $(subst parallel=,,$(filter parallel=%,$(subst $(COMMA), ,$(DEB_BUILD_OPTIONS))))
+endif
+
+#DEBHELPER_OPTIONS = -N libwpd-tools
+
+CONFIGURE_FLAGS = --disable-werror --enable-static
+
+
+build: build-arch build-indep
+
+build-arch: build-arch-stamp
+build-arch-stamp:
+	dh_testdir
+
+	dh_autoreconf && \
+	dh_auto_configure -- $(CONFIGURE_FLAGS) --without-docs
+	$(MAKE) $(NJOBS)
+ifeq (,$(findstring nocheck,$(DEB_BUILD_OPTIONS)))
+	cd src/test; $(MAKE) check
+endif
+
+	touch build-arch-stamp
+
+build-indep: build-indep-stamp
+build-indep-stamp:
+	dh_testdir
+
+	# There apparently is no way to build *only* the docs, so do it
+	# completely. If we already ran build-arch (full build) this only
+	# builds the docs *in addition*
+	if [ ! -f debian/autoreconf.after ]; then dh_autoreconf; fi && \
+	dh_auto_configure -- $(CONFIGURE_FLAGS)
+	$(MAKE)
+	
+	touch build-indep-stamp
+
+
+clean:
+	dh_testdir
+	dh_testroot
+	rm -f build-*-stamp 
+
+	[ ! -f Makefile ] || $(MAKE) distclean
+	dh_autoreconf_clean
+
+	rm -rf $(CURDIR)/docs/doxygen/html
+	rm -f config.log
+	rm -f debian/shlibs.local
+
+	dh_clean
+
+install:
+	dh_testdir
+	dh_testroot
+	dh_prep
+	dh_installdirs
+
+	$(MAKE) install DESTDIR=$(CURDIR)/debian/tmp
+	# fix path and remove unwanted files
+	if [ -d debian/tmp/usr/share/doc ]; then \
+		mv debian/tmp/usr/share/doc/libwpd \
+			debian/tmp/usr/share/doc/libwpd-doc && \
+		dh_install --sourcedir=debian/tmp; \
+	else \
+		dh_install -Nlibwpd-doc --sourcedir=debian/tmp; \
+	fi
+	
+binary-indep: build-indep install
+	dh_testdir -i
+	dh_testroot -i
+	dh_installchangelogs ChangeLog -i
+	dh_installdocs NEWS -i
+	dh_compress -i
+	dh_fixperms -i
+	dh_installdeb -i
+	dh_gencontrol -i
+	dh_md5sums -i
+	dh_builddeb -i
+
+binary-arch: build-arch install
+	dh_testdir
+	dh_testroot
+	dh_installchangelogs ChangeLog -a $(DEBHELPER_OPTIONS)
+	dh_installdocs NEWS -a $(DEBHELPER_OPTIONS)
+	dh_installexamples -a $(DEBHELPER_OPTIONS)
+	dh_installman -a $(DEBHELPER_OPTIONS)
+	dh_link -a $(DEBHELPER_OPTIONS)
+	dh_strip -a $(DEBHELPER_OPTIONS)
+	dh_compress -a $(DEBHELPER_OPTIONS)
+	dh_fixperms -a $(DEBHELPER_OPTIONS)
+	dh_makeshlibs
+	cat debian/libwpd-0.10-10/DEBIAN/shlibs > debian/shlibs.local
+	dh_shlibdeps -a l debian/libwpd-0.10-10/usr/lib/$(DEB_HOST_MULTIARCH) \
+		$(DEBHELPER_OPTIONS)
+	rm debian/shlibs.local
+	dh_installdeb -a $(DEBHELPER_OPTIONS)
+	dh_gencontrol -a $(DEBHELPER_OPTIONS)
+	dh_md5sums -a $(DEBHELPER_OPTIONS)
+	dh_builddeb -a $(DEBHELPER_OPTIONS)
+
+binary: binary-indep binary-arch
+.PHONY: build build-arch build-indep clean binary-indep binary-arch binary install 
