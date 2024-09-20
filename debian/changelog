@@ -1,3 +1,9 @@
+libwpd (0.10.3-2deepin0) unstable; urgency=medium
+
+  * No source change upload against GCC 12.
+
+ -- Tianyu Chen <sweetyfish@deepin.org>  Fri, 20 Sep 2024 12:12:07 +0800
+
 libwpd (0.10.3-2) unstable; urgency=medium
 
   * debian/patches/stddef.h.diff: add missing #include <stddef.h> to fix
